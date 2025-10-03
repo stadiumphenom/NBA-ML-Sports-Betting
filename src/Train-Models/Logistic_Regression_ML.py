@@ -1,36 +1,44 @@
 import sqlite3
-
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
+import joblib
 
-dataset = "dataset_2012-23"
-con = sqlite3.connect("../../Data/dataset.sqlite")
-data = pd.read_sql_query(f"select * from \"{dataset}\"", con, index_col="index")
-con.close()
+DB_PATH = "../../Data/dataset.sqlite"
+TABLE_NAME = "features_all"
 
-margin = data['Home-Team-Win']
-data.drop(['Score', 'Home-Team-Win', 'TEAM_NAME', 'Date', 'TEAM_NAME.1', 'Date.1', 'OU-Cover', 'OU'],
-          axis=1, inplace=True)
+def load_data():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query(f"SELECT * FROM {TABLE_NAME}", conn)
+    conn.close()
 
-data = data.values
+    # Target = Home Win (1 if home team wins, 0 if away wins)
+    y = df["home_win"].astype(int)
 
-data = data.astype(float)
+    # Features = drop identifiers + labels
+    X = df.drop(columns=["home_win", "ou_cover", "gameday", "home_team", "away_team"])
+    return X.values.astype(float), y.values
 
-X_train, X_test, y_train, y_test = train_test_split(data, margin, test_size=0.1, random_state=1)
 
-model = LogisticRegression()
+if __name__ == "__main__":
+    X, y = load_data()
 
-# Train the model on the training data
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
-# Generate a classification report
-report = classification_report(y_test, y_pred)
+    model = LogisticRegression(max_iter=500)
 
-# Print the results
-print(f"Accuracy: {accuracy}")
-print("Classification Report:")
-print(report)
+    # Train model
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    accuracy = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred)
+
+    print(f"Accuracy: {accuracy:.3f}")
+    print("Classification Report:")
+    print(report)
+
+    # Save trained model
+    joblib.dump(model, "../../Models/Logistic_Models/LogReg_NFL_ML.pkl")
+    print("Model saved to ../../Models/Logistic_Models/LogReg_NFL_ML.pkl")
