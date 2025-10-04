@@ -1,40 +1,38 @@
 import argparse
+import tensorflow as tf
 import sqlite3
 import pandas as pd
-import tensorflow as tf
 
+from src.DataProviders.NFLDataProvider import get_todays_nfl_games, build_historical_features
 from src.Predict import NN_Runner, XGBoost_Runner
 
 DB_PATH = "Data/dataset.sqlite"
 
-def load_todays_games():
+def load_todays_features():
+    """Load features for today's games from SQLite."""
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("SELECT * FROM todays_games", conn)
     conn.close()
-    return df
 
-def load_features():
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT * FROM features_all", conn)
-    conn.close()
-    return df
+    if df.empty:
+        print("No NFL games scheduled for today.")
+        return pd.DataFrame()
+
+    # Drop non-feature columns
+    X = df.drop(columns=["gameday", "home_team", "away_team"])
+    return df, X.values.astype(float)
+
 
 def main():
-    games = load_todays_games()
-    features = load_features()
-
-    if games.empty:
-        print("No NFL games scheduled for today.")
+    # Step 1: Get today's games from nflverse
+    todays_games = get_todays_nfl_games()
+    if todays_games.empty:
         return
 
-    # Filter features for today's games
-    today_features = features[
-        features["gameday"].isin(games["gameday"])
-    ]
+    # Step 2: Load features from DB
+    games, X = load_todays_features()
 
-    # Drop label/ID cols for prediction
-    X = today_features.drop(columns=["home_win", "ou_cover", "gameday", "home_team", "away_team"]).values.astype(float)
-
+    # Step 3: Run selected models
     if args.nn:
         print("------------ Neural Network Predictions -----------")
         X_norm = tf.keras.utils.normalize(X, axis=1)
@@ -55,10 +53,19 @@ def main():
         NN_Runner.nn_runner(X_norm, games)
         print("---------------------------------------------------")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run NFL ML Predictions")
     parser.add_argument("-xgb", action="store_true", help="Run with XGBoost Model")
     parser.add_argument("-nn", action="store_true", help="Run with Neural Network Model")
     parser.add_argument("-A", action="store_true", help="Run all Models")
+    parser.add_argument(
+        "-hist", action="store_true",
+        help="Build historical dataset (for training). Run once before training models."
+    )
     args = parser.parse_args()
+
+    if args.hist:
+        build_historical_features()
+
     main()
