@@ -1,17 +1,22 @@
-from src.DataProviders.NFLDataProvider import build_historical_features, get_todays_nfl_games
+from src.DataProviders.NFLDataProvider import get_todays_nfl_games, build_historical_features
 
 def create_historical_dataset():
-    """Build and save full historical NFL dataset."""
-    print("Building historical NFL dataset...")
-    df = build_historical_features(range(2012, 2025))
-    print(f"Created historical dataset with {len(df)} rows")
+    """Build and save full historical NFL dataset into features_all."""
+    print("[Create_Games] Building historical NFL dataset...")
+    df = build_historical_features()
+    print(f"[Create_Games] Done. Saved {len(df)} rows into features_all.")
 
 def create_todays_games():
-    """Fetch and save today's NFL games."""
-    print("Fetching today's NFL games...")
+    """Fetch and save today's NFL games into todays_games."""
+    print("[Create_Games] Fetching today's NFL games...")
     df = get_todays_nfl_games()
-    print(df if not df.empty else "No games today.")
+    if df.empty:
+        print("[Create_Games] No games found today.")
+    else:
+        print("[Create_Games] Done.")
+        print(df)
 
 if __name__ == "__main__":
+    # Run both for testing
     create_historical_dataset()
     create_todays_games()
