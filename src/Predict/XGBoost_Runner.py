@@ -1,29 +1,27 @@
 import xgboost as xgb
 from src.Utils.tools import print_game_predictions
+from src.Utils.config_loader import load_config
+
+config = load_config()
 
 def xgb_runner(X, games):
     """
     Run NFL predictions with trained XGBoost models.
     Expects:
       X     = features as numpy array
-      games = dataframe of today's games (with home/away team, date, odds)
+      games = dataframe of today's games
     """
-
-    # Load NFL-trained models
+    # Load models from config
     xgb_ml = xgb.Booster()
-    xgb_ml.load_model("Models/XGBoost_Models/XGBoost_NFL_ML.json")
+    xgb_ml.load_model(config["models"]["xgb_ml"])
 
     xgb_ou = xgb.Booster()
-    xgb_ou.load_model("Models/XGBoost_Models/XGBoost_NFL_UO.json")
+    xgb_ou.load_model(config["models"]["xgb_ou"])
 
     dtest = xgb.DMatrix(X)
 
-    # Moneyline (home win)
-    ml_preds = xgb_ml.predict(dtest)
-    ml_probs = [p[1] for p in ml_preds]  # probability home wins
+    # Predictions
+    ml_preds = [p[1] for p in xgb_ml.predict(dtest)]   # home win prob
+    ou_preds = [p[1] for p in xgb_ou.predict(dtest)]   # over prob
 
-    # Over/Under
-    ou_preds = xgb_ou.predict(dtest)
-
-    # Centralized output
-    print_game_predictions(games, ml_probs=ml_probs, ou_probs=ou_preds)
+    print_game_predictions(games, ml_probs=ml_preds, ou_probs=ou_preds)
