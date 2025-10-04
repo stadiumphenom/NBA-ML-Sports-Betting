@@ -1,4 +1,5 @@
 import tensorflow as tf
+from src.Utils.tools import print_game_predictions
 
 def nn_runner(X, games):
     """
@@ -19,9 +20,5 @@ def nn_runner(X, games):
     # Over/Under
     ou_preds = nn_ou.predict(X, verbose=0)
 
-    # Print results
-    for i, game in enumerate(games.itertuples()):
-        print(f"{game.away_team} @ {game.home_team} ({game.gameday})")
-        print(f"   Home win probability: {ml_probs[i]:.2f}")
-        print(f"   Over probability: {ou_preds[i]:.2f}")
-        print("-" * 55)
+    # Centralized output
+    print_game_predictions(games, ml_probs=ml_probs, ou_probs=ou_preds)
