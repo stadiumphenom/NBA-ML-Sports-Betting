@@ -28,7 +28,7 @@ def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
         return pd.DataFrame()
 
     # Add Vegas lines
-    lines = nfl.import_lines([season])
+    lines = nfl.import_betting_lines([season])
     games_today = games_today.merge(
         lines[["game_id", "spread_line", "total_line", "away_moneyline", "home_moneyline"]],
         on="game_id", how="left"
@@ -55,7 +55,7 @@ def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
     schedules = nfl.import_schedules(seasons)
     schedules["gameday"] = pd.to_datetime(schedules["gameday"])
 
-    lines = nfl.import_lines(seasons)
+    lines = nfl.import_betting_lines([season])
     df = schedules.merge(
         lines[["game_id", "spread_line", "total_line", "away_moneyline", "home_moneyline"]],
         on="game_id", how="left"
