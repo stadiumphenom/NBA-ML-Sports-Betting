@@ -16,7 +16,7 @@ import subprocess
 import sys
 from typing import Optional
 
-
+DB_PATH = "Data/dataset.sqlite"
 
 def _import_lines_fallback(seasons):
     """
