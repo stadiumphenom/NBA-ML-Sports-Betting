@@ -4,7 +4,7 @@ import time
 from src.Utils.config_loader import load_config
 
 config = load_config()
-db_path, model_path = config["data"]["db_path"], config["models"]["nn_ml"]
+db_path, model_path = config["data"]["db_path"], config["models"]["nn_ou"]
 
 con = sqlite3.connect(db_path)
 data = pd.read_sql_query("SELECT * FROM features_all", con)
