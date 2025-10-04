@@ -6,12 +6,17 @@ import sqlite3
 DB_PATH = "Data/dataset.sqlite"
 
 def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
-    """Fetch NFL games + Vegas lines + team stats for a specific date (default = today)."""
+    """
+    Fetch NFL games + Vegas lines + team stats for a specific date (default = today).
+    Saves results into SQLite.
+    """
     if not date:
         date = datetime.today().strftime("%Y-%m-%d")
 
     target_date = pd.to_datetime(date)
-    season = target_date.year
+
+    # Correct NFL season detection: Aug -> same year, Jan/Feb -> previous year
+    season = target_date.year if target_date.month >= 8 else target_date.year - 1
 
     # Load schedule
     schedules = nfl.import_schedules([season])
@@ -19,18 +24,18 @@ def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
     games_today = schedules[schedules["gameday"] == target_date]
 
     if games_today.empty:
-        print(f"No NFL games found for {date}")
+        print(f"[NFLDataProvider] No NFL games found for {date}")
         return pd.DataFrame()
 
-    # Add lines
+    # Add Vegas lines
     lines = nfl.import_lines([season])
     games_today = games_today.merge(
         lines[["game_id", "spread_line", "total_line", "away_moneyline", "home_moneyline"]],
         on="game_id", how="left"
     )
 
-    # Add team stats
-    team_stats = nfl.import_team_stats([season])[["team", "epa_per_play", "points_per_game"]]
+    # Add team stats (EPA, points per game)
+    team_stats = nfl.import_team_stats([season])[["season", "team", "epa_per_play", "points_per_game"]]
     games_today = _merge_team_stats(games_today, team_stats)
 
     result = games_today[
@@ -43,7 +48,10 @@ def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
 
 
 def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
-    """Build historical dataset with outcomes (home_win, ou_cover)."""
+    """
+    Build historical dataset with outcomes (home_win, ou_cover) and features.
+    Saves into SQLite.
+    """
     schedules = nfl.import_schedules(seasons)
     schedules["gameday"] = pd.to_datetime(schedules["gameday"])
 
@@ -56,12 +64,16 @@ def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
     # Labels
     df["home_win"] = (df["home_score"] > df["away_score"]).astype(int)
     df["total_points"] = df["home_score"] + df["away_score"]
+
+    # Over/Under labels: 1 = over, 0 = under, -1 = push
     df["ou_cover"] = (df["total_points"] > df["total_line"]).astype(int)
+    df.loc[df["total_points"] == df["total_line"], "ou_cover"] = -1
 
     # Team stats
     team_stats = nfl.import_team_stats(seasons)[["season", "team", "epa_per_play", "points_per_game"]]
     df = _merge_team_stats(df, team_stats)
 
+    # Derived features
     df["epa_diff"] = df["home_epa"] - df["away_epa"]
     df["ppg_diff"] = df["home_ppg"] - df["away_ppg"]
     df["spread_vs_epa"] = df["spread_line"] - df["epa_diff"]
@@ -73,13 +85,20 @@ def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
          "home_epa", "away_epa", "home_ppg", "away_ppg",
          "epa_diff", "ppg_diff", "spread_vs_epa",
          "home_win", "ou_cover"]
-    ].dropna()
+    ]
+
+    # Drop missing data rows
+    before = len(features)
+    features = features.dropna()
+    after = len(features)
+    if before != after:
+        print(f"[NFLDataProvider] Dropped {before - after} rows due to missing stats.")
 
     save_to_sqlite(features, "features_all")
     return features
 
 
-def _merge_team_stats(df, stats):
+def _merge_team_stats(df: pd.DataFrame, stats: pd.DataFrame) -> pd.DataFrame:
     """Helper to merge home/away team stats into dataframe."""
     df = df.merge(
         stats, left_on=["season", "home_team"], right_on=["season", "team"], how="left"
@@ -88,14 +107,16 @@ def _merge_team_stats(df, stats):
     df = df.merge(
         stats, left_on=["season", "away_team"], right_on=["season", "team"], how="left"
     ).rename(columns={"epa_per_play": "away_epa", "points_per_game": "away_ppg"}).drop(columns="team")
+
     return df
 
 
 def save_to_sqlite(df: pd.DataFrame, table: str, db_path=DB_PATH):
+    """Save DataFrame into SQLite."""
     conn = sqlite3.connect(db_path)
     df.to_sql(table, conn, if_exists="replace", index=False)
     conn.close()
-    print(f"Saved {len(df)} rows into {db_path}:{table}")
+    print(f"[NFLDataProvider] Saved {len(df)} rows into {db_path}:{table}")
 
 
 if __name__ == "__main__":
@@ -103,6 +124,6 @@ if __name__ == "__main__":
     todays = get_todays_nfl_games()
     print(todays)
 
-    # Build historical features
+    # Build historical dataset
     hist = build_historical_features()
     print(hist.head())
