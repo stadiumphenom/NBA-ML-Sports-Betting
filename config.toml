@@ -1,23 +1,16 @@
 [data]
-# Path to dataset
 db_path = "Data/dataset.sqlite"
-
-# Seasons to build historical dataset from
 seasons = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
-
-# Default current season (leave blank to auto-detect current year)
 current_season = 2024
 
 [features]
-# Base features imported from nfl_data_py
 include = ["spread_line", "total_line", "home_epa", "away_epa", "home_ppg", "away_ppg"]
-
-# Derived features added in feature_builder
 derived = ["epa_diff", "ppg_diff", "spread_vs_epa"]
 
 [models]
-# Paths to trained models
 xgb_ml = "Models/XGBoost_Models/XGBoost_NFL_ML.json"
 xgb_ou = "Models/XGBoost_Models/XGBoost_NFL_UO.json"
 nn_ml = "Models/NN_Models/Trained-Model-NFL-ML.h5"
 nn_ou = "Models/NN_Models/Trained-Model-NFL-OU.h5"
+log_ml = "Models/Logistic_Models/LogReg_NFL_ML.pkl"
+log_ou = "Models/Logistic_Models/LogReg_NFL_OU.pkl"
