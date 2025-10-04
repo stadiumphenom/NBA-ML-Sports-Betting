@@ -1,96 +1,64 @@
-import copy
-
-import numpy as np
+import argparse
+import sqlite3
 import pandas as pd
-import xgboost as xgb
-from colorama import Fore, Style, init, deinit
-from src.Utils import Expected_Value
-from src.Utils import Kelly_Criterion as kc
+import tensorflow as tf
 
+from src.Predict import NN_Runner, XGBoost_Runner
 
-# from src.Utils.Dictionaries import team_index_current
-# from src.Utils.tools import get_json_data, to_data_frame, get_todays_games_json, create_todays_games
-init()
-xgb_ml = xgb.Booster()
-xgb_ml.load_model('Models/XGBoost_Models/XGBoost_68.7%_ML-4.json')
-xgb_uo = xgb.Booster()
-xgb_uo.load_model('Models/XGBoost_Models/XGBoost_53.7%_UO-9.json')
+DB_PATH = "Data/dataset.sqlite"
 
+def load_todays_games():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM todays_games", conn)
+    conn.close()
+    return df
 
-def xgb_runner(data, todays_games_uo, frame_ml, games, home_team_odds, away_team_odds, kelly_criterion):
-    ml_predictions_array = []
+def load_features():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM features_all", conn)
+    conn.close()
+    return df
 
-    for row in data:
-        ml_predictions_array.append(xgb_ml.predict(xgb.DMatrix(np.array([row]))))
+def main():
+    games = load_todays_games()
+    features = load_features()
 
-    frame_uo = copy.deepcopy(frame_ml)
-    frame_uo['OU'] = np.asarray(todays_games_uo)
-    data = frame_uo.values
-    data = data.astype(float)
+    if games.empty:
+        print("No NFL games scheduled for today.")
+        return
 
-    ou_predictions_array = []
+    # Filter features for today's games
+    today_features = features[
+        features["gameday"].isin(games["gameday"])
+    ]
 
-    for row in data:
-        ou_predictions_array.append(xgb_uo.predict(xgb.DMatrix(np.array([row]))))
+    # Drop label/ID cols for prediction
+    X = today_features.drop(columns=["home_win", "ou_cover", "gameday", "home_team", "away_team"]).values.astype(float)
 
-    count = 0
-    for game in games:
-        home_team = game[0]
-        away_team = game[1]
-        winner = int(np.argmax(ml_predictions_array[count]))
-        under_over = int(np.argmax(ou_predictions_array[count]))
-        winner_confidence = ml_predictions_array[count]
-        un_confidence = ou_predictions_array[count]
-        if winner == 1:
-            winner_confidence = round(winner_confidence[0][1] * 100, 1)
-            if under_over == 0:
-                un_confidence = round(ou_predictions_array[count][0][0] * 100, 1)
-                print(
-                    Fore.GREEN + home_team + Style.RESET_ALL + Fore.CYAN + f" ({winner_confidence}%)" + Style.RESET_ALL + ' vs ' + Fore.RED + away_team + Style.RESET_ALL + ': ' +
-                    Fore.MAGENTA + 'UNDER ' + Style.RESET_ALL + str(
-                        todays_games_uo[count]) + Style.RESET_ALL + Fore.CYAN + f" ({un_confidence}%)" + Style.RESET_ALL)
-            else:
-                un_confidence = round(ou_predictions_array[count][0][1] * 100, 1)
-                print(
-                    Fore.GREEN + home_team + Style.RESET_ALL + Fore.CYAN + f" ({winner_confidence}%)" + Style.RESET_ALL + ' vs ' + Fore.RED + away_team + Style.RESET_ALL + ': ' +
-                    Fore.BLUE + 'OVER ' + Style.RESET_ALL + str(
-                        todays_games_uo[count]) + Style.RESET_ALL + Fore.CYAN + f" ({un_confidence}%)" + Style.RESET_ALL)
-        else:
-            winner_confidence = round(winner_confidence[0][0] * 100, 1)
-            if under_over == 0:
-                un_confidence = round(ou_predictions_array[count][0][0] * 100, 1)
-                print(
-                    Fore.RED + home_team + Style.RESET_ALL + ' vs ' + Fore.GREEN + away_team + Style.RESET_ALL + Fore.CYAN + f" ({winner_confidence}%)" + Style.RESET_ALL + ': ' +
-                    Fore.MAGENTA + 'UNDER ' + Style.RESET_ALL + str(
-                        todays_games_uo[count]) + Style.RESET_ALL + Fore.CYAN + f" ({un_confidence}%)" + Style.RESET_ALL)
-            else:
-                un_confidence = round(ou_predictions_array[count][0][1] * 100, 1)
-                print(
-                    Fore.RED + home_team + Style.RESET_ALL + ' vs ' + Fore.GREEN + away_team + Style.RESET_ALL + Fore.CYAN + f" ({winner_confidence}%)" + Style.RESET_ALL + ': ' +
-                    Fore.BLUE + 'OVER ' + Style.RESET_ALL + str(
-                        todays_games_uo[count]) + Style.RESET_ALL + Fore.CYAN + f" ({un_confidence}%)" + Style.RESET_ALL)
-        count += 1
+    if args.nn:
+        print("------------ Neural Network Predictions -----------")
+        X_norm = tf.keras.utils.normalize(X, axis=1)
+        NN_Runner.nn_runner(X_norm, games)
+        print("---------------------------------------------------")
 
-    if kelly_criterion:
-        print("------------Expected Value & Kelly Criterion-----------")
-    else:
-        print("---------------------Expected Value--------------------")
-    count = 0
-    for game in games:
-        home_team = game[0]
-        away_team = game[1]
-        ev_home = ev_away = 0
-        if home_team_odds[count] and away_team_odds[count]:
-            ev_home = float(Expected_Value.expected_value(ml_predictions_array[count][0][1], int(home_team_odds[count])))
-            ev_away = float(Expected_Value.expected_value(ml_predictions_array[count][0][0], int(away_team_odds[count])))
-        expected_value_colors = {'home_color': Fore.GREEN if ev_home > 0 else Fore.RED,
-                        'away_color': Fore.GREEN if ev_away > 0 else Fore.RED}
-        bankroll_descriptor = ' Fraction of Bankroll: '
-        bankroll_fraction_home = bankroll_descriptor + str(kc.calculate_kelly_criterion(home_team_odds[count], ml_predictions_array[count][0][1])) + '%'
-        bankroll_fraction_away = bankroll_descriptor + str(kc.calculate_kelly_criterion(away_team_odds[count], ml_predictions_array[count][0][0])) + '%'
+    if args.xgb:
+        print("------------ XGBoost Predictions ------------------")
+        XGBoost_Runner.xgb_runner(X, games)
+        print("---------------------------------------------------")
 
-        print(home_team + ' EV: ' + expected_value_colors['home_color'] + str(ev_home) + Style.RESET_ALL + (bankroll_fraction_home if kelly_criterion else ''))
-        print(away_team + ' EV: ' + expected_value_colors['away_color'] + str(ev_away) + Style.RESET_ALL + (bankroll_fraction_away if kelly_criterion else ''))
-        count += 1
+    if args.A:
+        print("------------ XGBoost Predictions ------------------")
+        XGBoost_Runner.xgb_runner(X, games)
+        print("---------------------------------------------------")
+        print("------------ Neural Network Predictions -----------")
+        X_norm = tf.keras.utils.normalize(X, axis=1)
+        NN_Runner.nn_runner(X_norm, games)
+        print("---------------------------------------------------")
 
-    deinit()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run NFL ML Predictions")
+    parser.add_argument("-xgb", action="store_true", help="Run with XGBoost Model")
+    parser.add_argument("-nn", action="store_true", help="Run with Neural Network Model")
+    parser.add_argument("-A", action="store_true", help="Run all Models")
+    args = parser.parse_args()
+    main()
