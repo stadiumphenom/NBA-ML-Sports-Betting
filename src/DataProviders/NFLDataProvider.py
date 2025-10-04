@@ -2,6 +2,9 @@ import nfl_data_py as nfl
 import pandas as pd
 from datetime import datetime
 import sqlite3
+import inspect
+import subprocess
+import sys
 
 DB_PATH = "Data/dataset.sqlite"
 
@@ -9,22 +12,39 @@ DB_PATH = "Data/dataset.sqlite"
 def _import_lines_fallback(seasons):
     """
     Compatibility wrapper for all nfl_data_py versions.
-    Tries import_betting_data → import_betting_lines → import_lines
+    Handles 2022–2025 API changes gracefully.
     """
-    if hasattr(nfl, "import_betting_data"):
-        print("[NFLDataProvider] Using import_betting_data()")
-        return nfl.import_betting_data(seasons)
-    elif hasattr(nfl, "import_betting_lines"):
-        print("[NFLDataProvider] Using import_betting_lines()")
-        return nfl.import_betting_lines(seasons)
-    elif hasattr(nfl, "import_lines"):
-        print("[NFLDataProvider] Using import_lines()")
-        return nfl.import_lines(seasons)
-    else:
-        raise ImportError(
-            "[NFLDataProvider] Could not find betting data function in nfl_data_py. "
-            "Please upgrade with: pip install -U nfl_data_py"
-        )
+    funcs = {
+        "import_betting_data": "new (2024+) betting data API",
+        "import_betting_lines": "legacy (2023) betting lines API",
+        "import_lines": "very old (pre-2022) betting lines API"
+    }
+
+    for fn in funcs:
+        if hasattr(nfl, fn) and inspect.isfunction(getattr(nfl, fn)):
+            print(f"[NFLDataProvider] Using {fn} — {funcs[fn]}")
+            return getattr(nfl, fn)(seasons)
+
+    # self-heal mechanism: upgrade package if nothing works
+    print("[NFLDataProvider] ❌ No betting line import function found in nfl_data_py.")
+    print("[NFLDataProvider] Attempting to auto-upgrade package...")
+
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "nfl_data_py"])
+        import importlib
+        importlib.reload(nfl)
+        # Try again after upgrade
+        for fn in funcs:
+            if hasattr(nfl, fn) and inspect.isfunction(getattr(nfl, fn)):
+                print(f"[NFLDataProvider] Using {fn} — {funcs[fn]} (after upgrade)")
+                return getattr(nfl, fn)(seasons)
+    except Exception as e:
+        print(f"[NFLDataProvider] Auto-upgrade failed: {e}")
+
+    raise AttributeError(
+        "nfl_data_py has no betting data import function, even after upgrade. "
+        "Please check your environment or manually run: pip install -U nfl_data_py"
+    )
 
 
 def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
@@ -67,7 +87,7 @@ def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
 
 
 def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
-    """Build historical dataset with outcomes (home_win, ou_cover) and features."""
+    """Build historical dataset with outcomes (home_win, ou_cover) and derived features."""
     print(f"[NFLDataProvider] Building features for seasons: {list(seasons)}")
 
     schedules = nfl.import_schedules(seasons)
@@ -83,6 +103,7 @@ def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
     df["home_win"] = (df["home_score"] > df["away_score"]).astype(int)
     df["total_points"] = df["home_score"] + df["away_score"]
 
+    # Over/Under labels
     df["ou_cover"] = (df["total_points"] > df["total_line"]).astype(int)
     df.loc[df["total_points"] == df["total_line"], "ou_cover"] = -1
 
@@ -105,7 +126,7 @@ def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
     ].dropna()
 
     save_to_sqlite(features, "features_all")
-    print(f"[NFLDataProvider] Saved {len(features)} feature rows to SQLite.")
+    print(f"[NFLDataProvider] ✅ Saved {len(features)} feature rows to SQLite.")
     return features
 
 
@@ -127,12 +148,18 @@ def save_to_sqlite(df: pd.DataFrame, table: str, db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     df.to_sql(table, conn, if_exists="replace", index=False)
     conn.close()
-    print(f"[NFLDataProvider] Saved {len(df)} rows into {db_path}:{table}")
+    print(f"[NFLDataProvider] 💾 Saved {len(df)} rows into {db_path}:{table}")
 
 
 if __name__ == "__main__":
+    print("[NFLDataProvider] 🏈 Starting data build...\n")
+
+    # Build today's games
     todays = get_todays_nfl_games()
     print(todays)
 
+    # Build historical dataset
     hist = build_historical_features()
     print(hist.head())
+
+    print("\n✅ Done building NFL data pipeline.")
