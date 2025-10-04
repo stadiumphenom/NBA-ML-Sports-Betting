@@ -1,21 +1,22 @@
 import tensorflow as tf
-import numpy as np
 
 def nn_runner(X, games):
     """
-    Runs NFL predictions using Neural Network models.
-    Expects normalized features (X) and games DataFrame.
+    Run NFL predictions with trained Neural Network models.
+    Expects:
+      X     = normalized features as numpy array
+      games = dataframe of today's games (with home/away team, date, odds)
     """
 
-    # Load trained NFL models
+    # Load NFL-trained models
     nn_ml = tf.keras.models.load_model("Models/NN_Models/Trained-Model-NFL-ML.h5")
     nn_ou = tf.keras.models.load_model("Models/NN_Models/Trained-Model-NFL-OU.h5")
 
-    # Predict Moneyline (Home Win)
+    # Moneyline (home win)
     ml_preds = nn_ml.predict(X, verbose=0)
-    ml_probs = [p[1] for p in ml_preds]  # home win probability
+    ml_probs = [p[1] for p in ml_preds]  # probability home wins
 
-    # Predict Over/Under (Over probability)
+    # Over/Under
     ou_preds = nn_ou.predict(X, verbose=0)
 
     # Print results
@@ -23,3 +24,4 @@ def nn_runner(X, games):
         print(f"{game.away_team} @ {game.home_team} ({game.gameday})")
         print(f"   Home win probability: {ml_probs[i]:.2f}")
         print(f"   Over probability: {ou_preds[i]:.2f}")
+        print("-" * 55)
