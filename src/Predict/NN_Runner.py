@@ -1,24 +1,22 @@
 import tensorflow as tf
 from src.Utils.tools import print_game_predictions
+from src.Utils.config_loader import load_config
+
+config = load_config()
 
 def nn_runner(X, games):
     """
     Run NFL predictions with trained Neural Network models.
     Expects:
       X     = normalized features as numpy array
-      games = dataframe of today's games (with home/away team, date, odds)
+      games = dataframe of today's games
     """
+    # Load models from config
+    nn_ml = tf.keras.models.load_model(config["models"]["nn_ml"])
+    nn_ou = tf.keras.models.load_model(config["models"]["nn_ou"])
 
-    # Load NFL-trained models
-    nn_ml = tf.keras.models.load_model("Models/NN_Models/Trained-Model-NFL-ML.h5")
-    nn_ou = tf.keras.models.load_model("Models/NN_Models/Trained-Model-NFL-OU.h5")
+    # Predictions
+    ml_probs = [p[1] for p in nn_ml.predict(X, verbose=0)]
+    ou_probs = [p[1] for p in nn_ou.predict(X, verbose=0)]
 
-    # Moneyline (home win)
-    ml_preds = nn_ml.predict(X, verbose=0)
-    ml_probs = [p[1] for p in ml_preds]  # probability home wins
-
-    # Over/Under
-    ou_preds = nn_ou.predict(X, verbose=0)
-
-    # Centralized output
-    print_game_predictions(games, ml_probs=ml_probs, ou_probs=ou_preds)
+    print_game_predictions(games, ml_probs=ml_probs, ou_probs=ou_probs)
