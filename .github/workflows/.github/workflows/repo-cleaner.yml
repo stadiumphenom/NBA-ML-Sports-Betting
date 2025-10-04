@@ -1,0 +1,29 @@
+name: Repo Cleaner
+
+on:
+  workflow_dispatch: # run manually
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install black ruff mypy pytest
+
+      - name: Run repo cleaner (report only)
+        run: python scripts/repo_cleaner.py --root src
+
+      - name: Run repo cleaner (auto-fix)
+        if: github.event_name == 'workflow_dispatch'
+        run: python scripts/repo_cleaner.py --root src --fix
