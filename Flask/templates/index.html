@@ -1,34 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NFL Betting Dashboard 🏈</title>
     <style>
-        body { font-family: Arial; background: #0d1117; color: #e6edf3; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #444; padding: 8px; text-align: center; }
-        th { background: #161b22; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 20px;
+        }
+        h1 {
+            color: #58a6ff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid #30363d;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #161b22;
+            color: #58a6ff;
+        }
+        tr:nth-child(even) {
+            background-color: #1c2128;
+        }
+        tr:hover {
+            background-color: #21262d;
+        }
+        .message {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #1c2128;
+            border-left: 4px solid #58a6ff;
+        }
     </style>
 </head>
 <body>
     <h1>NFL Betting Model Dashboard</h1>
+
     {% if message %}
-        <p>{{ message }}</p>
+    <div class="message">
+        {{ message }}
+    </div>
     {% endif %}
-    {% if games %}
-        <table>
+
+    {% if games and games|length > 0 %}
+    <table>
+        <thead>
             <tr>
                 {% for key in games[0].keys() %}
                     <th>{{ key }}</th>
                 {% endfor %}
             </tr>
+        </thead>
+        <tbody>
             {% for game in games %}
-                <tr>
-                    {% for value in game.values() %}
-                        <td>{{ value }}</td>
-                    {% endfor %}
-                </tr>
+            <tr>
+                {% for value in game.values() %}
+                    <td>{{ value }}</td>
+                {% endfor %}
+            </tr>
             {% endfor %}
-        </table>
+        </tbody>
+    </table>
+    {% else %}
+        <p>No games available to display.</p>
     {% endif %}
 </body>
 </html>
