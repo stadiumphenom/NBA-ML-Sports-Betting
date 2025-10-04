@@ -5,7 +5,7 @@ It fetches **schedules, lines, and team stats** from the [nflverse](https://gith
 
 ---
 
-## 🚀 Features
+##_🚀_Features
 - **Automated NFL data ingestion** via `nfl_data_py`  
 - **SQLite-backed pipeline** for storing `features_all` (historical) and `todays_games` (daily matchups)  
 - **Model training** with Logistic Regression, XGBoost, and Neural Networks  
@@ -70,11 +70,7 @@ BUF @ KC (2025-10-03)
 
 ---
 
-✅ With this README in place, new contributors will immediately see:  
-- Repo is **NFL-only**  
-- Data flow is **automated** (nflverse → SQLite)  
-- Two ways to run predictions (CLI + Streamlit)  
-- Models + bankroll tools are built-in  
+
 
 ---
 
