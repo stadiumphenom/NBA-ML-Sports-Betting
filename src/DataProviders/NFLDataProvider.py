@@ -1,12 +1,10 @@
 # mypy: disable-error-code=import, syntax
 # pylint: disable=no-member, invalid-name, missing-module-docstring, import-error, wrong-import-order, line-too-long
-
 """
 NFL Data Provider module
 Fetches NFL schedules, betting lines, and team stats from nfl_data_py.
 Auto-saves processed datasets to SQLite for use in model pipelines.
 """
-
 from datetime import datetime
 import sqlite3
 import nfl_data_py as nfl
