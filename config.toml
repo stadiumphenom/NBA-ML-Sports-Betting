@@ -9,8 +9,8 @@ derived = ["epa_diff", "ppg_diff", "spread_vs_epa"]
 
 [models]
 xgb_ml = "Models/XGBoost_Models/XGBoost_NFL_ML.json"
-xgb_ou = "Models/XGBoost_Models/XGBoost_NFL_UO.json"
-nn_ml = "Models/NN_Models/Trained-Model-NFL-ML.h5"
-nn_ou = "Models/NN_Models/Trained-Model-NFL-OU.h5"
+xgb_ou = "Models/XGBoost_Models/XGBoost_NFL_OU.json"
+nn_ml  = "Models/NN_Models/Trained-Model-NFL-ML.h5"
+nn_ou  = "Models/NN_Models/Trained-Model-NFL-OU.h5"
 log_ml = "Models/Logistic_Models/LogReg_NFL_ML.pkl"
 log_ou = "Models/Logistic_Models/LogReg_NFL_OU.pkl"
