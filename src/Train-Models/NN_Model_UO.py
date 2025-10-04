@@ -1,56 +1,31 @@
-import sqlite3
-import time
-import numpy as np
-import pandas as pd
-import tensorflow as tf
+import sqlite3, numpy as np, pandas as pd, tensorflow as tf
 from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+import time
+from src.Utils.config_loader import load_config
 
-DB_PATH = "../../Data/dataset.sqlite"
-TABLE_NAME = "features_all"
+config = load_config()
+db_path, model_path = config["data"]["db_path"], config["models"]["nn_ml"]
 
-# Callbacks
-current_time = str(time.time())
-tensorboard = TensorBoard(log_dir=f'../../Logs/{current_time}')
-earlyStopping = EarlyStopping(monitor='val_loss', patience=10, verbose=1, mode='min')
-mcp_save = ModelCheckpoint(f'../../Models/NN_Models/Trained-Model-NFL-OU-{current_time}.h5',
-                           save_best_only=True, monitor='val_loss', mode='min')
+con = sqlite3.connect(db_path)
+data = pd.read_sql_query("SELECT * FROM features_all", con)
+con.close()
 
-def load_data():
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(f"SELECT * FROM {TABLE_NAME}", conn)
-    conn.close()
+y = data["ou_cover"]
+X = data.drop(columns=["home_win", "ou_cover", "gameday", "home_team", "away_team"]).values.astype(float)
+X = tf.keras.utils.normalize(X, axis=1)
 
-    # Target = OU cover (1 if over, 0 if under)
-    y = df["ou_cover"].astype(int)
+callbacks = [
+    TensorBoard(log_dir=f"Logs/{time.time()}"),
+    EarlyStopping(monitor="val_loss", patience=10, mode="min"),
+    ModelCheckpoint(model_path, save_best_only=True, monitor="val_loss", mode="min"),
+]
 
-    # Features: drop identifiers + labels
-    X = df.drop(columns=["home_win", "ou_cover", "gameday", "home_team", "away_team"])
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(512, activation="relu"),
+    tf.keras.layers.Dense(256, activation="relu"),
+    tf.keras.layers.Dense(128, activation="relu"),
+    tf.keras.layers.Dense(2, activation="softmax"),
+])
 
-    return X.values.astype(float), y.values
-
-
-if __name__ == "__main__":
-    X, y = load_data()
-
-    # Normalize features
-    X = tf.keras.utils.normalize(X, axis=1)
-
-    # Build model
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Dense(128, activation="relu"),
-        tf.keras.layers.Dense(64, activation="relu"),
-        tf.keras.layers.Dense(1, activation="sigmoid")  # binary output
-    ])
-
-    model.compile(optimizer="adam",
-                  loss="binary_crossentropy",
-                  metrics=["accuracy"])
-
-    # Train
-    model.fit(X, y,
-              epochs=50,
-              validation_split=0.1,
-              batch_size=32,
-              callbacks=[tensorboard, earlyStopping, mcp_save])
-
-    print("Training complete. Best model saved.")
+model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+model.fit(X, y, epochs=50, validation_split=0.1, batch_size=32, callbacks=callbacks)
