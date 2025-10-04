@@ -1,64 +1,32 @@
-import argparse
-import sqlite3
-import pandas as pd
-import tensorflow as tf
+import xgboost as xgb
 
-from src.Predict import NN_Runner, XGBoost_Runner
+def xgb_runner(X, games):
+    """
+    Run NFL predictions with trained XGBoost models.
+    Expects:
+      X     = features as numpy array
+      games = dataframe of today's games (with home/away team, date, odds)
+    """
 
-DB_PATH = "Data/dataset.sqlite"
+    # Load NFL-trained models
+    xgb_ml = xgb.Booster()
+    xgb_ml.load_model("Models/XGBoost_Models/XGBoost_NFL_ML.json")
 
-def load_todays_games():
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT * FROM todays_games", conn)
-    conn.close()
-    return df
+    xgb_ou = xgb.Booster()
+    xgb_ou.load_model("Models/XGBoost_Models/XGBoost_NFL_UO.json")
 
-def load_features():
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT * FROM features_all", conn)
-    conn.close()
-    return df
+    dtest = xgb.DMatrix(X)
 
-def main():
-    games = load_todays_games()
-    features = load_features()
+    # Moneyline (home win)
+    ml_preds = xgb_ml.predict(dtest)
+    ml_probs = [p[1] for p in ml_preds]  # probability home wins
 
-    if games.empty:
-        print("No NFL games scheduled for today.")
-        return
+    # Over/Under
+    ou_preds = xgb_ou.predict(dtest)
 
-    # Filter features for today's games
-    today_features = features[
-        features["gameday"].isin(games["gameday"])
-    ]
-
-    # Drop label/ID cols for prediction
-    X = today_features.drop(columns=["home_win", "ou_cover", "gameday", "home_team", "away_team"]).values.astype(float)
-
-    if args.nn:
-        print("------------ Neural Network Predictions -----------")
-        X_norm = tf.keras.utils.normalize(X, axis=1)
-        NN_Runner.nn_runner(X_norm, games)
-        print("---------------------------------------------------")
-
-    if args.xgb:
-        print("------------ XGBoost Predictions ------------------")
-        XGBoost_Runner.xgb_runner(X, games)
-        print("---------------------------------------------------")
-
-    if args.A:
-        print("------------ XGBoost Predictions ------------------")
-        XGBoost_Runner.xgb_runner(X, games)
-        print("---------------------------------------------------")
-        print("------------ Neural Network Predictions -----------")
-        X_norm = tf.keras.utils.normalize(X, axis=1)
-        NN_Runner.nn_runner(X_norm, games)
-        print("---------------------------------------------------")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run NFL ML Predictions")
-    parser.add_argument("-xgb", action="store_true", help="Run with XGBoost Model")
-    parser.add_argument("-nn", action="store_true", help="Run with Neural Network Model")
-    parser.add_argument("-A", action="store_true", help="Run all Models")
-    args = parser.parse_args()
-    main()
+    # Print results
+    for i, game in enumerate(games.itertuples()):
+        print(f"{game.away_team} @ {game.home_team} ({game.gameday})")
+        print(f"   Home win probability: {ml_probs[i]:.2f}")
+        print(f"   Over probability: {ou_preds[i]:.2f}")
+        print("-" * 55)
