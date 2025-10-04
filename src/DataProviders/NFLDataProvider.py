@@ -5,6 +5,7 @@ import sqlite3
 
 DB_PATH = "Data/dataset.sqlite"
 
+
 def get_todays_nfl_games(date: str = None) -> pd.DataFrame:
     """
     Fetch NFL games + Vegas lines + team stats for a specific date (default = today).
@@ -52,10 +53,13 @@ def build_historical_features(seasons=range(2012, 2025)) -> pd.DataFrame:
     Build historical dataset with outcomes (home_win, ou_cover) and features.
     Saves into SQLite.
     """
+    print(f"[NFLDataProvider] Building features for seasons: {list(seasons)}")
+
     schedules = nfl.import_schedules(seasons)
     schedules["gameday"] = pd.to_datetime(schedules["gameday"])
 
-    lines = nfl.import_betting_lines([season])
+    # ✅ fixed variable name here
+    lines = nfl.import_betting_lines(seasons)
     df = schedules.merge(
         lines[["game_id", "spread_line", "total_line", "away_moneyline", "home_moneyline"]],
         on="game_id", how="left"
