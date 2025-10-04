@@ -17,16 +17,18 @@ def save_table(df: pd.DataFrame, table: str, db_path: str = DB_PATH, mode: str =
     conn.close()
     print(f"[tools] Saved {len(df)} rows to {db_path}:{table}")
 
-def print_game_predictions(games: pd.DataFrame, ml_probs, ou_probs):
+def print_game_predictions(games: pd.DataFrame, ml_probs=None, ou_probs=None):
     """
     Nicely print game predictions.
     Expects:
       games    -> DataFrame with 'home_team', 'away_team', 'gameday'
-      ml_probs -> list of home win probabilities
-      ou_probs -> list of over probabilities
+      ml_probs -> list of home win probabilities (optional)
+      ou_probs -> list of over probabilities (optional)
     """
     for i, game in enumerate(games.itertuples()):
         print(f"{game.away_team} @ {game.home_team} ({game.gameday})")
-        print(f"   Home win probability: {ml_probs[i]:.2f}")
-        print(f"   Over probability: {ou_probs[i]:.2f}")
+        if ml_probs is not None:
+            print(f"   Home win probability: {ml_probs[i]:.2f}")
+        if ou_probs is not None:
+            print(f"   Over probability: {ou_probs[i]:.2f}")
         print("-" * 55)
